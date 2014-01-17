@@ -7,19 +7,19 @@
 ##############################
 #######  LOAD PACKAGES
 
-require(gbm)
-require(dismo)
-require(scales)
-require(ggplot2)
-require(lattice)
-require(ipred)
-require(party)
-require(RColorBrewer)
-require(tree)
-require(languageR)
-require(rms)
-require(ROCR)
-require(rpart)
+suppressWarnings(require(gbm))
+suppressWarnings(require(dismo))
+suppressWarnings(require(scales))
+suppressWarnings(require(ggplot2))
+suppressWarnings(require(lattice))
+suppressWarnings(require(ipred))
+suppressWarnings(require(party))
+suppressWarnings(require(RColorBrewer))
+suppressWarnings(require(tree))
+suppressWarnings(require(languageR))
+suppressWarnings(require(rms))
+suppressWarnings(require(ROCR))
+suppressWarnings(require(rpart))
 
 
 ################################################################
@@ -305,9 +305,9 @@ gbm.perspec <- function (gbm.object, x = 1, y = 2, pred.means = NULL, x.label = 
 #        NEW FUNCTION: makefoldvec: for cross validation in RF and BRT
 
    # define a fold vector so that the holdout samples are spatially uncorrelated from the training sets
-make_foldvec <- function(n.folds){
+make_foldvec <- function(n.folds,foldvar){
   ##n.folds = 12
-  nspecies <- max(as.numeric(subset1$spec))
+  nspecies <- max(as.numeric(as.factor(foldvar)))
   tempfolds1 <- numeric(nspecies)
   temp2 <- c(1:nspecies)
   reps <- floor(nspecies/n.folds)
@@ -316,6 +316,7 @@ make_foldvec <- function(n.folds){
   foldlink = numeric(nspecies)
   foldlink[1:(n.folds*counter2)] <- rep(c(1:n.folds),each=counter2)
   foldlink[which(foldlink==0)] <- n.folds
+  i=1
   for(i in 1:(n.folds)){
     temp3 <- sample(temp2,reps,replace=F)
     tempfolds1[counter1:counter2] <- temp3
@@ -324,8 +325,8 @@ make_foldvec <- function(n.folds){
     counter2 = counter2 + reps
   }
   if(length(which(tempfolds1==0)>0)) tempfolds1[which(tempfolds1==0)] <- temp2
-  foldVector <- foldlink[match(as.numeric(subset1$spec),tempfolds1)]
-  if(n.folds == length(unique(subset1$spec))) foldVector <- as.numeric(subset1$spec)
+  foldVector <- foldlink[match(as.numeric(as.factor(foldvar)),tempfolds1)]
+  if(n.folds == length(unique(foldvar))) foldVector <- as.numeric(as.factor(foldvar))
   return(foldVector)
 }
 
