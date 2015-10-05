@@ -448,7 +448,8 @@ RF_UnivariatePlots <- function(object, varimp, data,predictors,labels,allpredict
   
   # gbm.object = eval(parse(text=workingModel))
  # graphics.off()
-  if(plot) par(mfrow=plot.layout,ask=TRUE)
+  if(length(predictors)>1) ask=TRUE else ask=FALSE
+  if(plot) par(mfrow=plot.layout,ask=ask)
   smooth = FALSE
   rug = FALSE
   common.scale = TRUE
@@ -1146,6 +1147,8 @@ cforest_crossValidate <- function(data,full.model,
 
 	data.controls = cforestControl
 	counter=1
+	
+	if(fact) ndx = 2 else ndx=1
 
 	i=1
 	for(i in 1:n.folds){
@@ -1155,9 +1158,9 @@ cforest_crossValidate <- function(data,full.model,
 	  REAL <- eval(parse(text=sprintf("data$%s[which(foldVector==i)]",response)))
 	  j=1
 	  for(j in 1:length(which(foldVector==i))){
-		CVprediction[counter] <- as.numeric(predict_CV[[j]][,1])    ### KTS: check this: was [,2 before]
+		CVprediction[counter] <- as.numeric(predict_CV[[j]][,ndx])    ### KTS: check this: was [,2 before]
 		CVobserved[counter] <-  REAL[j]      
-		realprediction[counter] <- as.numeric(predict_real[[j]][,1])   
+		realprediction[counter] <- as.numeric(predict_real[[j]][,ndx])   
 		realdata[counter] <- REAL[j]         
 		counter = counter + 1  
 	  }
@@ -1185,14 +1188,14 @@ cforest_crossValidate <- function(data,full.model,
 	  pred <- prediction(CVprediction,CVobserved)     # for holdout samples in cross-validation
 	  perf <- performance(pred,"tpr","fpr")
 	  auc <- performance(pred,"auc")
-	  plot(perf)
+	  plot(perf,main="Cross-validation")
 	  results$CV_auc <- round(auc@y.values[[1]],2)
 	  text(.9,.1,paste("AUC = ",results$CV_auc,sep=""))
 	  
 	  pred <- prediction(realprediction,CVobserved)     # for final model
 	  perf <- performance(pred,"tpr","fpr")
 	  auc <- performance(pred,"auc")
-	  plot(perf)
+	  plot(perf,main="Training")
 	  results$real_auc <- round(auc@y.values[[1]],2)
 	  text(.9,.1,paste("AUC = ",results$real_auc,sep=""))
 	}
@@ -1203,54 +1206,60 @@ cforest_crossValidate <- function(data,full.model,
 	results$real_maxkappa <- NULL
 
 	if(binaryresponse){
-	graphics.off()
-	par(mfrow=c(2,1))
-	thresholds <- seq(0.01,0.99,length=101)   # "artificial" thresholds across which to examine performance
-	kappa <- numeric(length(thresholds))
-	for(i in 1:length(thresholds)){
-	  trueLabels <- CVobserved
-	  predLabels <- ifelse(CVprediction>=thresholds[i],1,0)
-	  tot <- length(CVobserved)
-	  tp <- length(which((trueLabels==1)&(predLabels==1)))  
-	  tn <- length(which((trueLabels==0)&(predLabels==0)))
-	  fp <- length(which((trueLabels==0)&(predLabels==1)))
-	  fn <- length(which((trueLabels==1)&(predLabels==0)))
-	  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
-	  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
-	  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
-	}
-	plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Holdout sample performance")
+		graphics.off()
+		par(mfrow=c(2,1))
+		thresholds <- seq(0.01,0.99,length=101)   # "artificial" thresholds across which to examine performance
+		kappa <- numeric(length(thresholds))
+		for(i in 1:length(thresholds)){
+		  trueLabels <- CVobserved
+		  predLabels <- ifelse(CVprediction>=thresholds[i],1,0)
+		  tot <- length(CVobserved)
+		  tp <- length(which((trueLabels==1)&(predLabels==1)))  
+		  tn <- length(which((trueLabels==0)&(predLabels==0)))
+		  fp <- length(which((trueLabels==0)&(predLabels==1)))
+		  fn <- length(which((trueLabels==1)&(predLabels==0)))
+		  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
+		  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
+		  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+		}
+		plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Holdout sample performance")
 
 
-	# find threshold value associated with highest Kappa for C-V data
+		# find threshold value associated with highest Kappa for C-V data
 
-	results$CV_maxkappa <- thresholds[which.max(kappa)]
+		results$CV_maxkappa <- thresholds[which.max(kappa)]
 
-	cat(sprintf("The most informative threshold (based on Kappa) is: %s\n",results$CV_maxkappa))
+		cat(sprintf("The most informative threshold (based on Kappa) is: %s\n",results$CV_maxkappa))
 
-
-	if(binaryresponse){
-	  if(is.null(threshold)) threshold=results$CV_maxkappa
-	}
-
-	kappa <- numeric(length(thresholds)) 
-	for(i in 1:length(thresholds)){
-	  trueLabels <- CVobserved
-	  predLabels <- ifelse(realprediction>=thresholds[i],1,0)    
-	  tot <- length(CVobserved)
-	  tp <- length(which((trueLabels==1)&(predLabels==1)))  
-	  tn <- length(which((trueLabels==0)&(predLabels==0)))
-	  fp <- length(which((trueLabels==0)&(predLabels==1)))
-	  fn <- length(which((trueLabels==1)&(predLabels==0)))
-	  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
-	  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
-	  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
-	}
-	plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Performance: full model")
-
-	}
 
 		if(binaryresponse){
+		  if(is.null(threshold)) threshold=results$CV_maxkappa
+		}
+
+		kappa <- numeric(length(thresholds)) 
+		for(i in 1:length(thresholds)){
+		  trueLabels <- CVobserved
+		  predLabels <- ifelse(realprediction>=thresholds[i],1,0)    
+		  tot <- length(CVobserved)
+		  tp <- length(which((trueLabels==1)&(predLabels==1)))  
+		  tn <- length(which((trueLabels==0)&(predLabels==0)))
+		  fp <- length(which((trueLabels==0)&(predLabels==1)))
+		  fn <- length(which((trueLabels==1)&(predLabels==0)))
+		  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
+		  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
+		  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+		}
+		plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Performance: full model")
+
+	}
+	 
+	results$confusion.mat <- NULL 
+	results$sensitivity <- NULL
+	results$specificity <- NULL
+	results$toterror <- NULL
+     
+
+	if(binaryresponse){
 		cutoff <- results$CV_maxkappa
 		### display confusion matrix and kappa for a single threshold
 		trueLabels <- CVobserved
@@ -1262,15 +1271,12 @@ cforest_crossValidate <- function(data,full.model,
 		fn <- length(which((trueLabels==1)&(predLabels==0)))
 		pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
 		pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
-		kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
-		kappa[i]
-		matrix(c(tp,fp,fn,tn),nrow=2,ncol=2)
-		sensitivity <- tp/(tp+fn)
-		specificity <- tn/(tn+fp)
-		toterror <- (fn+fp)/tot
-		sensitivity
-		specificity
-		toterror
+		# results$kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+		# results$kappa[i]
+		results$confusion.mat<-matrix(c(tp,fp,fn,tn),nrow=2,ncol=2)
+		results$sensitivity <- tp/(tp+fn)
+		results$specificity <- tn/(tn+fp)
+		results$toterror <- (fn+fp)/tot
 
 	}
 
