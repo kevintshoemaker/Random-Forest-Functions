@@ -1,5 +1,5 @@
 #########################################
-###############  Functions for extending the Random Forest algorithm in the "party" package
+###############  Functions for extending and visualizing results from the Random Forest algorithm in the "party" package
 ###############      K. Shoemaker 15 Jan 2014
 
 
@@ -324,7 +324,7 @@ make_foldvec <- function(n.folds,foldvar){
     counter1 = counter1 + reps
     counter2 = counter2 + reps
   }
-  if(length(which(tempfolds1==0)>0)) tempfolds1[which(tempfolds1==0)] <- temp2
+  if(length(which(tempfolds1==0))>0) tempfolds1[which(tempfolds1==0)] <- temp2
   foldVector <- foldlink[match(as.numeric(as.factor(foldvar)),tempfolds1)]
   if(n.folds == length(unique(foldvar))) foldVector <- as.numeric(as.factor(foldvar))
   return(foldVector)
@@ -1123,5 +1123,182 @@ RF_InteractionPlots <- function(x=2,y=5,object,data,predictors,family,zlim=NULL)
     #diff(range(b))
 
 }
+
+
+cforest_crossValidate <- function(data,full.model,
+                          pred.names, response, formula=formula1,
+                          threshold=NULL,binaryresponse=FALSE,fact=FALSE){
+
+	#####################
+	# START CV FUNCTION
+
+	results=list()
+	par(ask=TRUE)
+	counter = 1
+	CVprediction <- numeric(nrow(data))
+	CVobserved <- numeric(nrow(data))
+	realprediction <- numeric(nrow(data))
+	realdata <- numeric(nrow(data))
+
+	predictCols <- which(names(data)%in%pred.names)
+
+	responseData <- eval(parse(text=sprintf("data$%s",response)))
+
+	data.controls = cforestControl
+	counter=1
+
+	i=1
+	for(i in 1:n.folds){
+	  model <- cforest(formula, data = data[which(foldVector!=i),], controls=data.controls) 
+	  predict_CV  <- predict(model,newdata=data[which(foldVector==i),],type="prob") 
+	  predict_real  <-  predict(full.model,newdata=data[which(foldVector==i),],type="prob")
+	  REAL <- eval(parse(text=sprintf("data$%s[which(foldVector==i)]",response)))
+	  j=1
+	  for(j in 1:length(which(foldVector==i))){
+		CVprediction[counter] <- as.numeric(predict_CV[[j]][,1])    ### KTS: check this: was [,2 before]
+		CVobserved[counter] <-  REAL[j]      
+		realprediction[counter] <- as.numeric(predict_real[[j]][,1])   
+		realdata[counter] <- REAL[j]         
+		counter = counter + 1  
+	  }
+	}
+
+	if(fact){
+	  CVobserved = CVobserved-1
+	  realdata=realdata-1
+	}
+
+	results$CV_RMSE = sqrt(mean((CVobserved-CVprediction)^2))       # root mean squared error for holdout samples in 10-fold cross-validation ...
+	results$real_RMSE = sqrt(mean((CVobserved-realprediction)^2))  # root mean squared error for residuals from final model
+
+	# print RMSE statistics
+	cat(sprintf("RMSE for C-V (out of bag) data: %s\n",results$CV_RMSE)) 
+	cat(sprintf("RMSE for training (in bag) data: %s\n",results$real_RMSE))  
+
+
+	results$CV_auc <- NULL
+	results$real_auc <- NULL
+
+	if(binaryresponse){
+	  graphics.off()
+	  par(mfrow=c(2,1))
+	  pred <- prediction(CVprediction,CVobserved)     # for holdout samples in cross-validation
+	  perf <- performance(pred,"tpr","fpr")
+	  auc <- performance(pred,"auc")
+	  plot(perf)
+	  results$CV_auc <- round(auc@y.values[[1]],2)
+	  text(.9,.1,paste("AUC = ",results$CV_auc,sep=""))
+	  
+	  pred <- prediction(realprediction,CVobserved)     # for final model
+	  perf <- performance(pred,"tpr","fpr")
+	  auc <- performance(pred,"auc")
+	  plot(perf)
+	  results$real_auc <- round(auc@y.values[[1]],2)
+	  text(.9,.1,paste("AUC = ",results$real_auc,sep=""))
+	}
+
+	# COHEN KAPPA statistics
+
+	results$CV_maxkappa <- NULL
+	results$real_maxkappa <- NULL
+
+	if(binaryresponse){
+	graphics.off()
+	par(mfrow=c(2,1))
+	thresholds <- seq(0.01,0.99,length=101)   # "artificial" thresholds across which to examine performance
+	kappa <- numeric(length(thresholds))
+	for(i in 1:length(thresholds)){
+	  trueLabels <- CVobserved
+	  predLabels <- ifelse(CVprediction>=thresholds[i],1,0)
+	  tot <- length(CVobserved)
+	  tp <- length(which((trueLabels==1)&(predLabels==1)))  
+	  tn <- length(which((trueLabels==0)&(predLabels==0)))
+	  fp <- length(which((trueLabels==0)&(predLabels==1)))
+	  fn <- length(which((trueLabels==1)&(predLabels==0)))
+	  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
+	  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
+	  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+	}
+	plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Holdout sample performance")
+
+
+	# find threshold value associated with highest Kappa for C-V data
+
+	results$CV_maxkappa <- thresholds[which.max(kappa)]
+
+	cat(sprintf("The most informative threshold (based on Kappa) is: %s\n",results$CV_maxkappa))
+
+
+	if(binaryresponse){
+	  if(is.null(threshold)) threshold=results$CV_maxkappa
+	}
+
+	kappa <- numeric(length(thresholds)) 
+	for(i in 1:length(thresholds)){
+	  trueLabels <- CVobserved
+	  predLabels <- ifelse(realprediction>=thresholds[i],1,0)    
+	  tot <- length(CVobserved)
+	  tp <- length(which((trueLabels==1)&(predLabels==1)))  
+	  tn <- length(which((trueLabels==0)&(predLabels==0)))
+	  fp <- length(which((trueLabels==0)&(predLabels==1)))
+	  fn <- length(which((trueLabels==1)&(predLabels==0)))
+	  pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
+	  pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
+	  kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+	}
+	plot(thresholds,kappa,type="l",xlab="Threshold", ylab="Cohen's Kappa", main="Performance: full model")
+
+	}
+
+		if(binaryresponse){
+		cutoff <- results$CV_maxkappa
+		### display confusion matrix and kappa for a single threshold
+		trueLabels <- CVobserved
+		predLabels <- ifelse(CVprediction>=cutoff,1,0)    
+		tot <- length(CVobserved)
+		tp <- length(which((trueLabels==1)&(predLabels==1)))  
+		tn <- length(which((trueLabels==0)&(predLabels==0)))
+		fp <- length(which((trueLabels==0)&(predLabels==1)))
+		fn <- length(which((trueLabels==1)&(predLabels==0)))
+		pr_agree <- (tp+tn)/tot    # overall agreement, or accuracy
+		pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
+		kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
+		kappa[i]
+		matrix(c(tp,fp,fn,tn),nrow=2,ncol=2)
+		sensitivity <- tp/(tp+fn)
+		specificity <- tn/(tn+fp)
+		toterror <- (fn+fp)/tot
+		sensitivity
+		specificity
+		toterror
+
+	}
+
+	if(binaryresponse){
+	  CVprediction[which(CVprediction==1)] <- 0.9999
+	  CVprediction[which(CVprediction==0)] <- 0.0001
+	  realprediction[which(realprediction==1)] <- 0.9999
+	  realprediction[which(realprediction==0)] <- 0.0001
+	}
+
+
+	realdata = CVobserved
+	fit_deviance_CV <- mean((CVobserved-CVprediction)^2)
+	if(binaryresponse) fit_deviance_CV <- mean(-2*(dbinom(CVobserved,1,CVprediction,log=T)-dbinom(realdata,1,realdata,log=T)))
+	fit_deviance_real <- mean((CVobserved-realprediction)^2)
+	if(binaryresponse) fit_deviance_real <- mean(-2*(dbinom(CVobserved,1,realprediction,log=T)-dbinom(realdata,1,realdata,log=T)))
+	null_deviance <- mean((CVobserved-mean(CVobserved))^2)
+	if(binaryresponse) null_deviance <- mean(-2*(dbinom(CVobserved,1,mean(CVobserved),log=T)-dbinom(realdata,1,realdata,log=T)))
+	results$deviance_explained_CV <- (null_deviance-fit_deviance_CV)/null_deviance   # based on holdout samples
+	results$deviance_explained_real <- (null_deviance-fit_deviance_real)/null_deviance   # based on full model...
+
+	cat(sprintf("McFadden's pseudo R-squared for C-V (out of bag) data: %s\n",results$deviance_explained_CV))
+	cat(sprintf("McFadden's pseudo R-squared for training (in bag) data: %s\n",results$deviance_explained_real))
+
+	return(results)
+}
+
+
+
 
 #############################################################
