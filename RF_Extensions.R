@@ -1126,7 +1126,7 @@ RF_InteractionPlots <- function(x=2,y=5,object,data,predictors,family,zlim=NULL)
 }
 
 
-cforest_crossValidate <- function(data,full.model,
+cforest_crossValidate <- function(data,full.model,foldVector,
                           pred.names, response, formula=formula1,
                           threshold=NULL,binaryresponse=FALSE,fact=FALSE){
 
@@ -1134,7 +1134,7 @@ cforest_crossValidate <- function(data,full.model,
 	# START CV FUNCTION
 
 	results=list()
-	par(ask=TRUE)
+	if(binaryresponse) par(ask=TRUE)
 	counter = 1
 	CVprediction <- numeric(nrow(data))
 	CVobserved <- numeric(nrow(data))
@@ -1183,7 +1183,7 @@ cforest_crossValidate <- function(data,full.model,
 	results$real_auc <- NULL
 
 	if(binaryresponse){
-	  graphics.off()
+	  #graphics.off()
 	  par(mfrow=c(2,1))
 	  pred <- prediction(CVprediction,CVobserved)     # for holdout samples in cross-validation
 	  perf <- performance(pred,"tpr","fpr")
@@ -1206,7 +1206,7 @@ cforest_crossValidate <- function(data,full.model,
 	results$real_maxkappa <- NULL
 
 	if(binaryresponse){
-		graphics.off()
+		#graphics.off()
 		par(mfrow=c(2,1))
 		thresholds <- seq(0.01,0.99,length=101)   # "artificial" thresholds across which to examine performance
 		kappa <- numeric(length(thresholds))
