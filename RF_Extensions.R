@@ -22,6 +22,10 @@ suppressWarnings(require(ROCR))
 suppressWarnings(require(rpart))
 
 
+
+ ### NOTE: use installPackage function here******
+
+
 ################################################################
 #####################################  LOAD NEW FUNCTIONS
 
@@ -1214,7 +1218,7 @@ cforest_crossValidate <- function(data,full.model,foldVector,
 		  trueLabels <- CVobserved
 		  predLabels <- ifelse(CVprediction>=thresholds[i],1,0)
 		  tot <- length(CVobserved)
-		  tp <- length(which((trueLabels==1)&(predLabels==1)))  
+		  tp <- length(which((trueLabels==1)&(predLabels==1)))      
 		  tn <- length(which((trueLabels==0)&(predLabels==0)))
 		  fp <- length(which((trueLabels==0)&(predLabels==1)))
 		  fn <- length(which((trueLabels==1)&(predLabels==0)))
@@ -1227,7 +1231,7 @@ cforest_crossValidate <- function(data,full.model,foldVector,
 
 		# find threshold value associated with highest Kappa for C-V data
 
-		results$CV_maxkappa <- thresholds[which.max(kappa)]
+		results$CV_maxkappa <- thresholds[which.max(kappa)]  
 
 		cat(sprintf("The most informative threshold (based on Kappa) is: %s\n",results$CV_maxkappa))
 
@@ -1253,10 +1257,10 @@ cforest_crossValidate <- function(data,full.model,foldVector,
 
 	}
 	 
-	results$confusion.mat <- NULL 
-	results$sensitivity <- NULL
-	results$specificity <- NULL
-	results$toterror <- NULL
+	results$CV_confusion.mat <- NULL 
+	results$CV_sensitivity <- NULL
+	results$CV_specificity <- NULL
+	results$CV_toterror <- NULL
      
 
 	if(binaryresponse){
@@ -1273,10 +1277,12 @@ cforest_crossValidate <- function(data,full.model,foldVector,
 		pr_agree_rand <- ((tp+fn)/tot)*((tp+fp)/tot)+((fn+tn)/tot)*((fp+tn)/tot)
 		# results$kappa[i] <- (pr_agree-pr_agree_rand)/(1-pr_agree_rand)
 		# results$kappa[i]
-		results$confusion.mat<-matrix(c(tp,fp,fn,tn),nrow=2,ncol=2)
-		results$sensitivity <- tp/(tp+fn)
-		results$specificity <- tn/(tn+fp)
-		results$toterror <- (fn+fp)/tot
+		results$CV_confusion.mat<-matrix(c(tp,fp,fn,tn),nrow=2,ncol=2)
+		colnames(results$CV_confusion.mat) <- c("Model says true","Model says false")
+		rownames(results$CV_confusion.mat) <- c("Actually true","Actually false")
+		results$CV_sensitivity <- tp/(tp+fn)
+		results$CV_specificity <- tn/(tn+fp)
+		results$CV_toterror <- (fn+fp)/tot
 
 	}
 
