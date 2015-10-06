@@ -3,27 +3,35 @@
 ###############      K. Shoemaker 15 Jan 2014
 
 
-
 ##############################
 #######  LOAD PACKAGES
 
-suppressWarnings(require(gbm))
-suppressWarnings(require(dismo))
-suppressWarnings(require(scales))
-suppressWarnings(require(ggplot2))
-suppressWarnings(require(lattice))
-suppressWarnings(require(ipred))
-suppressWarnings(require(party))
-suppressWarnings(require(RColorBrewer))
-suppressWarnings(require(tree))
-suppressWarnings(require(languageR))
-suppressWarnings(require(rms))
-suppressWarnings(require(ROCR))
-suppressWarnings(require(rpart))
+loadPackage <- function(pkg){
+
+  if(pkg %in% rownames(installed.packages()) == FALSE) {suppressMessages(suppressWarnings(install.packages(pkg)))}
+  eval(parse(text=sprintf("suppressMessages(suppressWarnings(require(%s)))",pkg)), envir= .GlobalEnv)
+
+}
 
 
+loadPackage("party")
+loadPackage("rms")
+loadPackage("ROCR")
 
- ### NOTE: use installPackage function here******
+# suppressWarnings(require(gbm))
+# suppressWarnings(require(dismo))
+# suppressWarnings(require(scales))
+# suppressWarnings(require(ggplot2))
+# suppressWarnings(require(lattice))
+# suppressWarnings(require(ipred))
+# suppressWarnings(require(party))
+# suppressWarnings(require(RColorBrewer))
+# suppressWarnings(require(tree))
+# suppressWarnings(require(languageR))
+# suppressWarnings(require(rms))
+# suppressWarnings(require(ROCR))
+# suppressWarnings(require(rpart))
+
 
 
 ################################################################
