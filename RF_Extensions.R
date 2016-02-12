@@ -17,21 +17,7 @@ loadPackage <- function(pkg){
 loadPackage("party")
 loadPackage("rms")
 loadPackage("ROCR")
-
-# suppressWarnings(require(gbm))
-# suppressWarnings(require(dismo))
-# suppressWarnings(require(scales))
-# suppressWarnings(require(ggplot2))
-# suppressWarnings(require(lattice))
-# suppressWarnings(require(ipred))
-# suppressWarnings(require(party))
-# suppressWarnings(require(RColorBrewer))
-# suppressWarnings(require(tree))
-# suppressWarnings(require(languageR))
-# suppressWarnings(require(rms))
-# suppressWarnings(require(ROCR))
-# suppressWarnings(require(rpart))
-
+loadPackage("RColorBrewer")
 
 
 ################################################################
@@ -979,7 +965,8 @@ RF_InteractionPlots <- function(x=2,y=5,object,data,predictors,family,zlim=NULL)
     #        x.var <- y.var
     #    }
     #}
-    j <- 3
+    j=3
+    i=1
     for (i in 1:n.preds) {
         if (i != x & i != y) {
             if (is.vector(data2[, i])) {
@@ -1098,7 +1085,8 @@ RF_InteractionPlots <- function(x=2,y=5,object,data,predictors,family,zlim=NULL)
           xaxlab <- round(seq(min(pred.frame[, 2]),max(pred.frame[, 2]),length=5),2)
           horiz.limits <- c(min(pred.frame[, 2]),max(pred.frame[, 2]))
         }
-        axis(1,at=c(1:length(xaxlab)),labels=xaxlab)
+        axis(1,at=xaxlab,labels=xaxlab)        # c(1:length(xaxlab))
+        i = 3
         for (i in 1:length(factor.list)) {
             factor.level <- factor.list[i]
             #if()
